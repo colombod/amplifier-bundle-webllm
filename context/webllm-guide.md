@@ -37,9 +37,14 @@ Using WebLLM as an Amplifier provider (instead of raw JS) gives you:
 - **Hooks** - Logging, approval gates, observability
 - **Consistency** - Same patterns as CLI Amplifier
 
-Raw JavaScript WebLLM is only appropriate for:
-- Quick demos or prototypes
-- When the user explicitly requests "no Python" or "pure JavaScript"
+**Raw JavaScript WebLLM is ONLY appropriate when the user EXPLICITLY requests it** using phrases like:
+- "pure JavaScript"
+- "no Python"
+- "no Amplifier"
+- "raw WebLLM"
+- "vanilla JS"
+
+Terms like "simple", "demo", "minimal", or "portable" are NOT permission to skip Amplifier. Even demos should use the correct Amplifier + Pyodide architecture.
 
 ---
 
