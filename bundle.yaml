@@ -2,13 +2,10 @@ bundle:
   name: webllm
   version: 0.1.0
   description: |
-    WebLLM provider for Amplifier - local browser-based LLM inference via WebGPU.
-    Enables fully offline, private AI applications running entirely in the browser.
+    WebLLM bundle for browser-based local LLM inference via WebGPU.
     
-    Compose with amplifier-bundle-browser for complete browser Amplifier:
-      includes:
-        - bundle: amplifier-bundle-browser
-        - bundle: amplifier-bundle-webllm
+    Default: CLI-safe context for understanding WebLLM/WebGPU patterns.
+    For browser runtime: use behaviors/webllm-runtime explicitly.
 
 includes:
-  - bundle: webllm:behaviors/webllm
+  - bundle: webllm:behaviors/webllm-context

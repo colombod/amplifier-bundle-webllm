@@ -1,0 +1,10 @@
+bundle:
+  name: webllm-context
+  version: 0.1.0
+  description: |
+    WebLLM/WebGPU development context documentation. CLI-safe.
+    Use when you need guidance on WebLLM models and WebGPU requirements.
+
+context:
+  include:
+    - webllm:context/webllm-guide.md

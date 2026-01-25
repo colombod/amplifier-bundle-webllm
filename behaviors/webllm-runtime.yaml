@@ -1,0 +1,20 @@
+bundle:
+  name: webllm-runtime
+  version: 0.1.0
+  description: |
+    WebLLM provider for browser-based local inference.
+    BROWSER-ONLY: Requires WebGPU and Pyodide JS bridge.
+
+includes:
+  - bundle: webllm:behaviors/webllm-context
+
+providers:
+  - module: provider-webllm
+    source: webllm:modules/provider-webllm
+    config:
+      # Default model - good balance of size/quality
+      default_model: "Phi-3.5-mini-instruct-q4f16_1-MLC"
+      # Show download progress
+      show_progress: true
+      # Use browser cache for models
+      use_cache: true
