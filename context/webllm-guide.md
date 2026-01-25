@@ -697,12 +697,22 @@ async function initBrowserAmplifier(modelId, onProgress) {
     const pyodide = await loadPyodide();
     
     // 3. Install amplifier-core
+    // NOTE: amplifier-core is NOT on PyPI - use one of these patterns:
     onProgress?.({ progress: 0.3, text: 'Installing Amplifier...' });
     await pyodide.loadPackage('micropip');
-    await pyodide.runPythonAsync(`
-        import micropip
-        await micropip.install('amplifier-core')
-    `);
+    const micropip = pyodide.pyimport('micropip');
+    
+    // Install dependencies from PyPI
+    await micropip.install(['pydantic', 'pyyaml', 'typing-extensions']);
+    
+    // Option A: Static asset (web apps)
+    await micropip.install('/assets/amplifier_core-1.0.0-py3-none-any.whl');
+    
+    // Option B: Embedded wheel (single-file HTML) - see browser-guide.md
+    // const wheelB64 = document.getElementById('amplifier-wheel-b64').textContent.trim();
+    // const wheelBytes = Uint8Array.from(atob(wheelB64), c => c.charCodeAt(0));
+    // pyodide.FS.writeFile('/tmp/amplifier_core-1.0.0-py3-none-any.whl', wheelBytes);
+    // await micropip.install('emfs:/tmp/amplifier_core-1.0.0-py3-none-any.whl');
     
     // 4. Wait for WebLLM to finish
     onProgress?.({ progress: 0.6, text: 'Loading AI model...' });
