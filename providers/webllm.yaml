@@ -8,7 +8,7 @@ bundle:
 
 providers:
   - module: provider-webllm
-    source: webllm:modules/provider-webllm
+    source: git+https://github.com/microsoft/amplifier-bundle-webllm@main#subdirectory=modules/provider-webllm
     config:
       # Phi-3.5-mini: Good default - 2.4GB, works on 4GB+ VRAM
       default_model: "Phi-3.5-mini-instruct-q4f16_1-MLC"

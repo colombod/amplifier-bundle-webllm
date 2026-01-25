@@ -6,9 +6,10 @@ bundle:
     Provides the Provider implementation and supporting context.
 
 # WebLLM provider configuration
+# NOTE: This provider requires JS bridge setup - won't work in CLI, only browser
 providers:
   - module: provider-webllm
-    source: webllm:modules/provider-webllm
+    source: git+https://github.com/microsoft/amplifier-bundle-webllm@main#subdirectory=modules/provider-webllm
     config:
       # Default model - good balance of size/quality
       default_model: "Phi-3.5-mini-instruct-q4f16_1-MLC"
