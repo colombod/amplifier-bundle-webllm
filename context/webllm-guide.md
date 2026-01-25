@@ -424,6 +424,371 @@ async function initProvider() {
 
 ---
 
+## Advanced Provider Bridge Patterns
+
+### Complete Provider Bridge with Streaming
+
+For real-time token streaming (better UX), implement a streaming bridge:
+
+```javascript
+// JavaScript side - streaming bridge
+async function llmCompleteStreaming(requestJson, onChunk) {
+    const request = JSON.parse(requestJson);
+    
+    const chunks = [];
+    const stream = await engine.chat.completions.create({
+        messages: request.messages,
+        temperature: request.temperature ?? 0.7,
+        max_tokens: request.max_tokens ?? 1024,
+        stream: true  // Enable streaming
+    });
+    
+    for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content || '';
+        if (delta) {
+            chunks.push(delta);
+            // Call Python callback with each chunk
+            onChunk(JSON.stringify({
+                type: 'delta',
+                content: delta
+            }));
+        }
+    }
+    
+    // Return complete response
+    return JSON.stringify({
+        id: 'chat-' + Date.now(),
+        object: 'chat.completion',
+        model: engine.currentModelId,
+        choices: [{
+            index: 0,
+            message: {
+                role: 'assistant',
+                content: chunks.join('')
+            },
+            finish_reason: 'stop'
+        }]
+    });
+}
+
+// Register streaming bridge
+pyodide.globals.set('js_llm_complete_streaming', llmCompleteStreaming);
+```
+
+```python
+# Python side - WebLLM provider with streaming support
+import json
+from js import js_llm_complete_streaming
+
+class WebLLMProvider:
+    """WebLLM provider that bridges to JavaScript WebLLM engine."""
+    
+    def __init__(self):
+        self.name = "webllm"
+        self._streaming_callback = None
+    
+    async def complete(self, request: dict) -> dict:
+        """Non-streaming completion."""
+        from js import js_llm_complete
+        response_json = await js_llm_complete(json.dumps(request))
+        return json.loads(response_json)
+    
+    async def complete_streaming(self, request: dict, on_chunk):
+        """Streaming completion with callback for each token."""
+        
+        def js_callback(chunk_json):
+            chunk = json.loads(chunk_json)
+            if chunk['type'] == 'delta':
+                on_chunk(chunk['content'])
+        
+        response_json = await js_llm_complete_streaming(
+            json.dumps(request),
+            js_callback
+        )
+        return json.loads(response_json)
+```
+
+### Web Worker Integration
+
+For best performance, run WebLLM in a dedicated Web Worker:
+
+```javascript
+// webllm-worker.js - Dedicated WebLLM worker
+import { CreateMLCEngine } from '@mlc-ai/web-llm';
+
+let engine = null;
+
+self.onmessage = async (event) => {
+    const { type, id, payload } = event.data;
+    
+    try {
+        switch (type) {
+            case 'init':
+                engine = await CreateMLCEngine(payload.modelId, {
+                    initProgressCallback: (progress) => {
+                        self.postMessage({
+                            type: 'progress',
+                            id,
+                            payload: {
+                                progress: progress.progress,
+                                text: progress.text
+                            }
+                        });
+                    }
+                });
+                self.postMessage({ type: 'init_complete', id });
+                break;
+                
+            case 'complete':
+                const response = await engine.chat.completions.create(payload);
+                self.postMessage({
+                    type: 'complete_result',
+                    id,
+                    payload: response
+                });
+                break;
+                
+            case 'complete_streaming':
+                const stream = await engine.chat.completions.create({
+                    ...payload,
+                    stream: true
+                });
+                
+                for await (const chunk of stream) {
+                    self.postMessage({
+                        type: 'stream_chunk',
+                        id,
+                        payload: chunk
+                    });
+                }
+                
+                self.postMessage({ type: 'stream_end', id });
+                break;
+        }
+    } catch (error) {
+        self.postMessage({
+            type: 'error',
+            id,
+            payload: { message: error.message }
+        });
+    }
+};
+```
+
+```javascript
+// main.js - WebLLM worker manager
+class WebLLMWorkerManager {
+    constructor() {
+        this.worker = new Worker('webllm-worker.js', { type: 'module' });
+        this.pending = new Map();
+        this.nextId = 0;
+        
+        this.worker.onmessage = (event) => {
+            const { type, id, payload } = event.data;
+            const handler = this.pending.get(id);
+            
+            if (handler) {
+                handler(type, payload);
+            }
+        };
+    }
+    
+    async init(modelId, onProgress) {
+        return new Promise((resolve, reject) => {
+            const id = this.nextId++;
+            
+            this.pending.set(id, (type, payload) => {
+                if (type === 'progress') {
+                    onProgress?.(payload);
+                } else if (type === 'init_complete') {
+                    this.pending.delete(id);
+                    resolve();
+                } else if (type === 'error') {
+                    this.pending.delete(id);
+                    reject(new Error(payload.message));
+                }
+            });
+            
+            this.worker.postMessage({
+                type: 'init',
+                id,
+                payload: { modelId }
+            });
+        });
+    }
+    
+    async complete(request) {
+        return new Promise((resolve, reject) => {
+            const id = this.nextId++;
+            
+            this.pending.set(id, (type, payload) => {
+                if (type === 'complete_result') {
+                    this.pending.delete(id);
+                    resolve(payload);
+                } else if (type === 'error') {
+                    this.pending.delete(id);
+                    reject(new Error(payload.message));
+                }
+            });
+            
+            this.worker.postMessage({
+                type: 'complete',
+                id,
+                payload: request
+            });
+        });
+    }
+    
+    async *completeStreaming(request) {
+        const id = this.nextId++;
+        const chunks = [];
+        let done = false;
+        let error = null;
+        
+        this.pending.set(id, (type, payload) => {
+            if (type === 'stream_chunk') {
+                chunks.push(payload);
+            } else if (type === 'stream_end') {
+                done = true;
+                this.pending.delete(id);
+            } else if (type === 'error') {
+                error = new Error(payload.message);
+                this.pending.delete(id);
+            }
+        });
+        
+        this.worker.postMessage({
+            type: 'complete_streaming',
+            id,
+            payload: request
+        });
+        
+        // Yield chunks as they arrive
+        while (!done && !error) {
+            while (chunks.length > 0) {
+                yield chunks.shift();
+            }
+            await new Promise(r => setTimeout(r, 10));
+        }
+        
+        if (error) throw error;
+    }
+}
+```
+
+### Pyodide ↔ WebLLM Worker Bridge
+
+Complete pattern for running Amplifier in Pyodide with WebLLM in a separate worker:
+
+```javascript
+// Full integration pattern
+async function initBrowserAmplifier(modelId, onProgress) {
+    // 1. Start WebLLM worker initialization (parallel)
+    const webllmManager = new WebLLMWorkerManager();
+    const webllmPromise = webllmManager.init(modelId, onProgress);
+    
+    // 2. Load Pyodide (parallel)
+    onProgress?.({ progress: 0, text: 'Loading Python runtime...' });
+    const pyodide = await loadPyodide();
+    
+    // 3. Install amplifier-core
+    onProgress?.({ progress: 0.3, text: 'Installing Amplifier...' });
+    await pyodide.loadPackage('micropip');
+    await pyodide.runPythonAsync(`
+        import micropip
+        await micropip.install('amplifier-core')
+    `);
+    
+    // 4. Wait for WebLLM to finish
+    onProgress?.({ progress: 0.6, text: 'Loading AI model...' });
+    await webllmPromise;
+    
+    // 5. Create bridge function
+    pyodide.globals.set('js_llm_complete', async (requestJson) => {
+        const request = JSON.parse(requestJson);
+        const response = await webllmManager.complete({
+            messages: request.messages,
+            temperature: request.temperature || 0.7,
+            max_tokens: request.max_tokens || 1024
+        });
+        return JSON.stringify(response);
+    });
+    
+    // 6. Initialize Amplifier session
+    onProgress?.({ progress: 0.9, text: 'Starting session...' });
+    await pyodide.runPythonAsync(`
+        from amplifier_core import create_session
+        # Session setup with WebLLM provider bridge
+    `);
+    
+    onProgress?.({ progress: 1.0, text: 'Ready!' });
+    
+    return { pyodide, webllmManager };
+}
+```
+
+---
+
+## Debugging WebLLM
+
+### Check WebGPU Support
+
+```javascript
+async function checkWebGPUSupport() {
+    if (!navigator.gpu) {
+        return { supported: false, reason: 'WebGPU not available' };
+    }
+    
+    try {
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) {
+            return { supported: false, reason: 'No GPU adapter found' };
+        }
+        
+        const device = await adapter.requestDevice();
+        const info = await adapter.requestAdapterInfo();
+        
+        return {
+            supported: true,
+            vendor: info.vendor,
+            architecture: info.architecture,
+            device: info.device,
+            maxBufferSize: device.limits.maxBufferSize
+        };
+    } catch (e) {
+        return { supported: false, reason: e.message };
+    }
+}
+```
+
+### Monitor Model Loading
+
+```javascript
+const engine = await CreateMLCEngine(modelId, {
+    initProgressCallback: (progress) => {
+        console.log(`[WebLLM] ${progress.text}`);
+        console.log(`[WebLLM] Progress: ${(progress.progress * 100).toFixed(1)}%`);
+        
+        // Log memory usage if available
+        if (performance.memory) {
+            console.log(`[WebLLM] Heap used: ${(performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1)}MB`);
+        }
+    }
+});
+```
+
+### Common Issues
+
+| Symptom | Likely Cause | Solution |
+|---------|--------------|----------|
+| Progress stuck at 0% | Network issue | Check connection, try different CDN |
+| Progress stuck at 99% | Shader compilation | Wait longer, update GPU drivers |
+| "Out of memory" at load | Model too large | Use smaller model or quantization |
+| Very slow inference | Wrong GPU selected | Check `navigator.gpu.requestAdapter()` |
+| First response slow | Model not warmed up | Run warm-up inference after load |
+
+---
+
 ## References
 
 - WebLLM Documentation: https://webllm.mlc.ai/
