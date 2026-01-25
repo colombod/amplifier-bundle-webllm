@@ -1,0 +1,23 @@
+bundle:
+  name: webllm-behavior
+  version: 0.1.0
+  description: |
+    WebLLM provider behavior - local inference via WebGPU.
+    Provides the Provider implementation and supporting context.
+
+# WebLLM provider configuration
+providers:
+  - module: provider-webllm
+    source: webllm:modules/provider-webllm
+    config:
+      # Default model - good balance of size/quality
+      default_model: "Phi-3.5-mini-instruct-q4f16_1-MLC"
+      # Show download progress
+      show_progress: true
+      # Use browser cache for models
+      use_cache: true
+
+# Inject WebLLM context for AI awareness
+context:
+  include:
+    - webllm:context/webllm-guide.md

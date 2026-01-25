@@ -1,0 +1,22 @@
+# Default WebLLM provider configuration fragment
+# Use this to add WebLLM as a provider to any bundle
+
+bundle:
+  name: provider-webllm-default
+  version: 0.1.0
+  description: Default WebLLM provider configuration
+
+providers:
+  - module: provider-webllm
+    source: webllm:modules/provider-webllm
+    config:
+      # Phi-3.5-mini: Good default - 2.4GB, works on 4GB+ VRAM
+      default_model: "Phi-3.5-mini-instruct-q4f16_1-MLC"
+      
+      # Model loading options
+      show_progress: true
+      use_cache: true
+      
+      # Generation defaults
+      temperature: 0.7
+      max_tokens: 1024
