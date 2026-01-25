@@ -4,6 +4,45 @@ This document provides context for AI assistants working with WebLLM-based Ampli
 
 ---
 
+## IMPORTANT: WebLLM as an Amplifier Provider
+
+**WebLLM in the Amplifier ecosystem is used as a PROVIDER for Amplifier sessions, not as a standalone JavaScript library.**
+
+### The Correct Architecture
+
+```
+Browser App
+  |
+  +-- Pyodide (Python in WASM)
+        |
+        +-- amplifier-core
+              |
+              +-- WebLLM Provider (via JS bridge)
+                    |
+                    +-- WebLLM Engine (JavaScript)
+```
+
+### NOT This (Unless Explicitly Requested)
+
+```
+[X] Browser App --> WebLLM Engine (raw JS, no Amplifier)
+```
+
+### Why Use WebLLM Through Amplifier?
+
+Using WebLLM as an Amplifier provider (instead of raw JS) gives you:
+- **Session management** - Amplifier handles conversation history
+- **Tool support** - Use browser-storage, todo, custom tools
+- **Provider switching** - Swap to OpenAI/Anthropic without code changes
+- **Hooks** - Logging, approval gates, observability
+- **Consistency** - Same patterns as CLI Amplifier
+
+Raw JavaScript WebLLM is only appropriate for:
+- Quick demos or prototypes
+- When the user explicitly requests "no Python" or "pure JavaScript"
+
+---
+
 ## What is WebLLM?
 
 WebLLM runs Large Language Models directly in web browsers using WebGPU for hardware acceleration. This enables:
