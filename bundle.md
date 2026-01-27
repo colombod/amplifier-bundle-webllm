@@ -46,6 +46,9 @@ Build browser-based AI applications using WebLLM for inference and Amplifier for
 ---
 
 @webllm:context/webllm-guide.md
+@webllm:context/model-selection-guide.md
+@webllm:context/error-handling.md
+@webllm:context/system-prompt-escaping.md
 
 ---
 
