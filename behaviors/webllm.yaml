@@ -1,0 +1,8 @@
+bundle:
+  name: webllm-behavior
+  version: 1.0.0
+  description: WebLLM context and provider configuration for browser-based LLM inference
+
+context:
+  include:
+    - webllm:context/webllm-guide.md
