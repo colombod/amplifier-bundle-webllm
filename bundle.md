@@ -6,7 +6,6 @@ bundle:
 
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
-  - bundle: git+https://github.com/microsoft/amplifier-bundle-webruntime@main#subdirectory=behaviors/webruntime
   - bundle: webllm:behaviors/webllm
 ---
 
@@ -18,15 +17,15 @@ Build browser-based AI applications using WebLLM for inference and Amplifier for
 
 ## What This Bundle Provides
 
-### From webruntime (included)
+### From webruntime (included via behavior)
 - **webruntime-developer** agent for building browser Amplifier apps
 - Pyodide integration patterns
 - Autonomous Playwright testing
 
 ### WebLLM-Specific
-- WebLLM provider bridge for Amplifier
-- Model selection guidance
+- WebLLM model selection guidance
 - WebGPU optimization patterns
+- Browser compatibility information
 
 ## Quick Start
 

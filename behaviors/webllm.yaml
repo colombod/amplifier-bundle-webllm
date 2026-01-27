@@ -1,8 +1,13 @@
 bundle:
   name: webllm-behavior
   version: 1.0.0
-  description: WebLLM context and provider configuration for browser-based LLM inference
+  description: WebLLM browser AI capabilities with webruntime agent for building apps
 
+# Include the webruntime behavior (brings webruntime-developer agent)
+includes:
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-webruntime@main#subdirectory=behaviors/webruntime
+
+# WebLLM-specific context
 context:
   include:
     - webllm:context/webllm-guide.md
