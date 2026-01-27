@@ -3,14 +3,9 @@ bundle:
   version: 1.0.0
   description: WebLLM browser AI capabilities with webruntime agent for building apps
 
-# Include webruntime bundle so its namespace is available
+# Include webruntime BEHAVIOR (not root bundle)
 includes:
-  - bundle: git+https://github.com/microsoft/amplifier-bundle-webruntime@main
-
-# Include the agent (now webruntime namespace is available)
-agents:
-  include:
-    - webruntime:webruntime-developer
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-webruntime@main#subdirectory=behaviors/webruntime
 
 # WebLLM-specific context
 context:
